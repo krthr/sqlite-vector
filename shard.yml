@@ -1,0 +1,9 @@
+name: sqlite-vector
+version: 0.1.0
+
+authors:
+  - Wilson Tovar <wtovaragudelo@gmail.com>
+
+crystal: '>= 1.21.1'
+
+license: MIT
