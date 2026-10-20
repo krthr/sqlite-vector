@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: 1.21.1
+      - name: Install SQLite with extension loading
+        run: |
+          brew install sqlite
+          echo "CRYSTAL_LIBRARY_PATH=$(brew --prefix sqlite)/lib:$(crystal env CRYSTAL_LIBRARY_PATH)" >> "$GITHUB_ENV"
+      - name: Test
+        run: |
+          shards install
+          sh scripts/install.sh
+          sh scripts/test_install.sh
+          crystal tool format --check
+          crystal spec
+          sh scripts/test_deployment.sh
+
+  linux:
+    name: ${{ matrix.runner }} / ${{ matrix.libc }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        libc: [glibc, musl]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test glibc
+        if: matrix.libc == 'glibc'
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work crystallang/crystal:1.21.1 sh -ec '
+            apt-get update
+            apt-get install -y libsqlite3-dev curl ca-certificates git
+            shards install
+            sh scripts/install.sh
+            sh scripts/test_install.sh
+            crystal tool format --check
+            crystal spec
+            sh scripts/test_deployment.sh
+          '
+      - name: Test musl
+        if: matrix.libc == 'musl'
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work crystallang/crystal:1.21.1-alpine sh -ec '
+            apk add --no-cache sqlite-dev curl ca-certificates git
+            shards install
+            sh scripts/install.sh
+            sh scripts/test_install.sh
+            crystal tool format --check
+            crystal spec
+            sh scripts/test_deployment.sh
+          '
